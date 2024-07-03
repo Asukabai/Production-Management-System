@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ss.managesys.mapper.PlanAdminMapper">
+
+    <!--新增 时先判断是否存在重复产品名 -->
+    <select id="selectIfHave" resultType="java.lang.Integer">
+        SELECT COUNT(prod_id) as num
+        FROM product
+        WHERE ifdelete = 0 AND prod_model = 'gtr';
+    </select>
+
+    <!--
+    /**【上传新产品任务】 保存 操作员和检验员 */
+    Integer insertPrTaUser(String prodModel,String taskName,String operatorOrExaminers,Integer auth);-->
+    <insert id="insertPrTaUser">
+        INSERT INTO prod_task_user (prod_id,task_name,user_id,user_auth)VALUES
+        ((SELECT prod_id FROM product WHERE prod_model = #{prodModel} AND ifdelete = 0),#{taskName},
+        (SELECT user_id FROM `user` WHERE user_name = #{operatorOrExaminers} AND auth = #{auth} AND ifdelete = 0),#{auth})
+    </insert>
+
+    <!--  !!!!!!!!!!!报子查询超过一行!!!!!!!!!!!!!!!!!  /**【上传新产品任务】 查，准备需要insert的数据 操作员和检验员 */
+    ArrayList<ProdTaskUser> selectProdTaskUser(String prodModel,@Param("operatorAndExaminers") ArrayList<String> operatorAndExaminers, Integer auth);-->
+    <select id="selectProdTaskUser" resultType="com.ss.managesys.entity.po.ProdTaskUser">
+        SELECT t1.prod_id,user_id,user_auth FROM product AS t1
+        WHERE prod_model = #{prodModel} AND ifdelete = 0),#{taskName},
+            (SELECT user_id FROM `user` WHERE user_name = #{operatorOrExaminer} AND auth = #{auth} AND ifdelete = 0),#{auth}
+    </select>
+
+    <!--  !!!!!!!!!!报语法错误!!!!!!!!!!!!!!!  /**【上传新产品任务】 保存 操作员和检验员 */
+    Integer insertProdTaskUser(String prodModel,String taskName,@Param("operatorAndExaminers") ArrayList<String> operatorAndExaminers),Integer auth;-->
+    <insert id="insertProdTaskUser">
+        INSERT INTO prod_task_user (prod_id,task_name,user_id,user_auth)VALUES
+        <foreach collection="operatorAndExaminers" item="operatorOrExaminer" separator=",">
+            ((SELECT prod_id FROM product WHERE prod_model = #{prodModel} AND ifdelete = 0),#{taskName},
+            (SELECT user_id FROM `user` WHERE user_name = #{operatorOrExaminer} AND auth = #{auth} AND ifdelete = 0),#{auth})
+        </foreach>
+    </insert>
+
+    <!--！！！！！！！！！！！！！获取prod插入后的插入的prodID-->
+    <select id="selectProdInsertProdAutoId" resultType="java.lang.Integer">
+        SELECT prod_id FROM product
+        WHERE prod_model = #{prodModel} AND ifdelete = 0;
+    </select>
+
+    <!--！！！！！！！！！！！！！根据人名找userID-->
+    <select id="selectUserIDByUserName" resultType="java.lang.Integer">
+        SELECT user_id FROM user
+        WHERE user_name = #{userName} AND ifdelete = 0;
+    </select>
+
+    <!--！！！！！！！！！！！！！ptu 全插入-->
+    <insert id="insertptoOPrEx">
+        INSERT INTO prod_task_user (prod_id,task_name,user_id,user_auth,task_order) VALUES
+        (#{prodId},#{taskName},#{userId},#{auth},#{orderNum})
+    </insert>
+
+    <!--    /**【上传新产品任务】 保存 task 任务*/
+    Integer insertTask(String prodModel,@Param("planExcelTvos") ArrayList<PlanExcelTvo> planExcelTvos);-->
+    <insert id="insertTask">
+        INSERT INTO task (prod_model,task_name,planday)VALUES
+        <foreach collection="planExcelTvos" item="planExcel" separator=",">
+            (#{prodModel},#{planExcel.taskName},#{planExcel.planDay})
+        </foreach>
+    </insert>
+
+    <!--    /**【上传新产品任务】 保存prod产品*/
+    Integer insertProd(String prodModel, String prodStage, String prodDirector, Integer creatorID);-->
+    <insert id="insertProd">
+        INSERT INTO product (prod_model,prod_stage,prod_director,creator_id)VALUES
+        (#{prodModel},#{prodStage},#{prodDirector},#{creatorID});
+    </insert>
+
+    <!--    /**【检验员产品任务列表】补充任务对应操作员 */
+    ArrayList<ExaminerTvo> selectTaskOperators (String taskName, Integer authOperator);
+        GROUP BY t1.task_name,t1.prod_id
+    -->
+    <select id="selectTaskOperators" resultType="com.ss.managesys.entity.vo.tvo.ExaminerTvo">
+        SELECT t1.task_name,GROUP_CONCAT(t2.user_name) AS operator,GROUP_CONCAT(t1.user_id) AS operatorID
+        FROM prod_task_user AS t1
+        LEFT JOIN `user` AS t2 on t1.user_id = t2.user_id
+        WHERE t1.user_auth = #{authOperator} AND t1.task_name = #{taskName} AND t1.prod_id = #{prodId}
+    </select>
+    <!--    /**【计划管理员分页获取产品列表与任务列表】 查出需要展示得到产品*/
+    ArrayList<PlanCardsProdListDetailTvo> selectProd();-->
+    <select id="selectProd" resultType="com.ss.managesys.entity.vo.tvo.PlanCardsProdListDetailTvo">
+        SELECT prod_id,prod_model,prod_stage,prod_status,prod_creatday AS prodCreateDay,ifsend
+        FROM product
+        WHERE ifdelete = 0;
+    </select>
+    <!--    /**【计划管理员分页获取产品列表与任务列表】 查出产品对应的任务*/
+    ArrayList<PlanCardsChildrenTvo> selectTask(String prodModel,String keywords);
+            OR t2.user_name LIKE concat('%',#{keywords},'%');-->
+    <select id="selectTask" resultType="com.ss.managesys.entity.vo.tvo.PlanCardsChildrenTvo">
+        SELECT t1.task_name,t2.user_name AS operator,t1.planday,(TIMESTAMPDIFF(day,t1.task_creatday,t1.task_updateday)+1)AS realday,
+        t1.task_status,t1.task_creatday
+        FROM task AS t1
+        LEFT JOIN `user` AS t2 ON t1.operator_id = t2.user_id
+        WHERE t1.ifdelete = 0 AND t1.prod_model = #{prodModel} AND concat(IFNULL(t1.task_name,''),
+        IFNULL(t1.prod_model,''),IFNULL(t1.planday,''),IFNULL(t1.task_creatday,'')) like concat('%',#{keywords},'%')
+
+    </select>
+
+    <!--    /**【查看任务检验单】*/
+    ArrayList<PlanAdminCheckCardVo> selectCheckCard(String prodModel);-->
+    <select id="selectCheckCard" resultType="com.ss.managesys.entity.vo.PlanAdminCheckCardVo">
+        SELECT t1.prod_model,t1.prod_stage,t2.task_name,t2.task_status,t2.task_creatday
+        FROM product AS t1
+        LEFT JOIN task as t2
+        ON t1.prod_model = t2.prod_model
+        WHERE t2.if_check_card = 1 AND t1.prod_model = #{prodModel} AND t1.ifdelete = 0 AND t1.ifsend = 1;
+    </select>
+
+    <!--删除产品-->
+    <update id="updateProdDelete">
+        UPDATE `product` SET ifdelete = 1
+        WHERE prod_model = #{prodModel} AND ifdelete = 0;
+    </update>
+
+    <!--  下发产品任务**/
+    Integer updateProdSendAndStatus((String prodModel,Integer statusShiShi);-->
+    <update id="updateProdSendAndStatus">
+        UPDATE `product` AS p1,task AS t1 SET p1.ifsend = 1,p1.prod_status = #{statusShiShi},t1.task_status = 2
+        WHERE p1.prod_model = #{prodModel} AND p1.ifdelete = 0 AND p1.ifsend = 0 AND p1.prod_model = t1.prod_model;
+    </update>
+    <!--检查是否已经下发-->
+    <select id="selectProdIfSend" resultType="com.ss.managesys.entity.po.Product">
+        SELECT * FROM product
+        WHERE prod_model = #{prodModel} AND ifdelete = 0;
+    </select>
+</mapper>

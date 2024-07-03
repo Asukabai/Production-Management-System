@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ss.managesys.mapper.ExaminerMapper">
+
+
+    <!--    /**【检验员产品任务列表】补充任务对应操作员 */
+    ArrayList<ExaminerTvo> selectTaskOperators (@Param("taskNameAndProds") ArrayList<TaskAndProd> taskNameAndProds,Integer authOperator);-->
+    <!--【操作员产品任务列表】补充任务对应检验员
+        查找的为对应匹配的 没有被检验员确认的 多个 检验员情况-->
+    <select id="selectTaskOperators" resultType="com.ss.managesys.entity.vo.tvo.ExaminerTvo">
+        SELECT t1.task_name,GROUP_CONCAT(t2.user_name) AS operator,GROUP_CONCAT(t1.user_id) AS operatorIds
+        FROM prod_task_user AS t1
+        LEFT JOIN `user` AS t2 on t1.user_id = t2.user_id
+        WHERE t1.user_auth = #{authOperator} AND
+        <foreach collection="taskAndProds" item="taskAndProd" open="(" separator="OR" close=")">
+            (t1.task_name = #{taskAndProd.taskName} AND t1.prod_id = #{taskAndProd.prodId})
+        </foreach>
+        GROUP BY t1.task_name,t1.prod_id
+        ORDER BY task_name
+    </select>
+
+    <!--    /**【检验员产品任务列表】补充任务列表其他字段 */
+    ArrayList<ExaminerTvo> selectTaskExamCards(@Param("taskNameAndProds") ArrayList<TaskAndProd> taskNameAndProds);-->
+    <select id="selectTaskExamCards" resultType="com.ss.managesys.entity.vo.tvo.ExaminerTvo">
+        SELECT t1.prod_model,t1.task_name,t2.user_name AS operator,t1.operator_id AS operatorIds,t1.examin_status
+        FROM task AS t1
+        LEFT JOIN `user` AS t2 ON t1.operator_id = t2.user_id
+        WHERE t1.ifdelete = 0 AND t1.if_operator_sub = 1 AND
+        <foreach collection="taskAndProds" item="taskAndProd" open="(" separator="OR" close=")">
+            (t1.task_name = #{taskAndProd.taskName} AND t1.prod_Model = #{taskAndProd.prodModel})
+        </foreach>
+    </select>
+
+
+    <!--    /**【出具检验单】select task 查任务表全部符合条件的任务  操作员已提交的 对应的任务*/
+    Integer selectTaskList(@Param("ptos") ArrayList<InOperator> ptos);-->
+    <select id="selectTaskList" resultType="java.lang.Integer">
+        SELECT COUNT(task_id) AS num FROM task WHERE if_operator_sub = 1 AND ifdelete = 0 AND
+         <foreach collection="ptos" item="pto" open="(" separator="OR" close=")">
+             (prod_model=#{pto.prodModel} AND task_name=#{pto.taskName} AND operator_id = #{pto.operatorID})
+         </foreach>
+    </select>
+
+    <!--    /**【任务是否合格】修改检验状态*/  更改任务为非当前任务
+    Integer updateTaskExaminStatus(Integer examinerId,String prodMode,String taskName);-->
+    <update id="updateTaskExaminStatus">
+        UPDATE task SET examin_status = #{examinStatus},examiner_id = #{examinerId},task_status = #{taskStatus},if_now_task = 0
+        WHERE prod_model = #{prodMode} AND task_name = #{taskName} AND ifdelete = 0;
+    </update>
+
+    <!--    /**【第三方检验员出具检验单】*/
+      Integer updateTaskCheckCard(@Param("ptos") ArrayList<InOperator> ptos,Integer examinerId);-->
+    <update id="updateTaskCheckCard">
+        UPDATE task SET if_check_card = 1,task_status = 3
+        WHERE examiner_id = #{examinerId} AND ifdelete = 0 AND
+        <foreach collection="ptos" item="pto" open="(" separator="OR" close=")">
+            (prod_model=#{pto.prodModel} AND task_name=#{pto.taskName} AND operator_id = #{pto.operatorIds})
+        </foreach>
+    </update>
+</mapper>

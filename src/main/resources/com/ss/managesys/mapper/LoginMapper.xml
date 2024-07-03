@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ss.managesys.mapper.LoginMapper">
+
+    <!-- selectUser 用户登陆查用户-->
+    <select id="selectUser" resultType="com.ss.managesys.entity.po.User">
+        SELECT * FROM user
+        WHERE user_name = #{userName} AND user_password = #{userPassword} AND ifdelete = 0;
+    </select>
+
+    <!-- updateUserPW 修改用户密码-->
+    <update id="updateUserPW">
+        UPDATE `user` SET user_password = #{newPW}
+        WHERE user_name = #{userName} AND user_password = #{oldPW} AND ifdelete = 0;
+    </update>
+</mapper>

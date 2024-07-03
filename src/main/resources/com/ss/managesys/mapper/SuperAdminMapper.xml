@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ss.managesys.mapper.SuperAdminMapper">
+
+    <!--查询所有权限项-->
+    <select id="selectAllAuth" resultType="com.ss.managesys.entity.vo.ShowAuthVo">
+        SELECT auth AS value,user_role AS label FROM  all_role
+        LIMIT 5;
+    </select>
+
+    <!--查询分页用户的数据-->
+    <select id="selectPageUser" resultType="com.ss.managesys.entity.vo.UserVo">
+        SELECT t1.user_id,t1.user_name,t2.user_role AS auth FROM user AS t1
+        LEFT JOIN all_role AS t2 ON t1.auth = t2.auth
+        WHERE t1.ifdelete = 0 AND (t1.user_name LIKE CONCAT('%',#{keywords},'%') OR t2.user_role LIKE CONCAT('%',#{keywords},'%'))
+        LIMIT #{limitIndex},#{pageSize};
+    </select>
+
+    <!--    /**查询用户数量 totalDataNum**/
+    ArrayList<UserVo> selectUserNum(String keywords);-->
+    <select id="selectUserNum" resultType="java.lang.Integer">
+        SELECT COUNT(t1.user_id) FROM user AS t1
+        LEFT JOIN all_role AS t2 ON t1.auth = t2.auth
+        WHERE t1.ifdelete = 0 AND (t1.user_name LIKE CONCAT('%',#{keywords},'%') OR t2.user_role LIKE CONCAT('%',#{keywords},'%'));
+    </select>
+
+    <!--依据用户 id 修改用户权限-->
+    <update id="updateUserAuth">
+        UPDATE `user` SET auth = #{auth}
+        WHERE user_id = #{userId} AND ifdelete = 0;
+    </update>
+
+    <!--依据用户 id 删除用户-->
+    <update id="updateUserDelete">
+        UPDATE `user` SET ifdelete = 1
+        WHERE ifdelete = 0 AND user_id IN
+        <foreach collection="userIdList" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>;
+    </update>
+
+    <!--    /**新增用户*/
+    Integer insertUser(String newUserName,Integer auth);-->
+    <insert id="insertUser">
+        INSERT INTO `user` (user_name,auth)VALUES(#{newUserName},#{auth});
+    </insert>
+</mapper>
+
+
